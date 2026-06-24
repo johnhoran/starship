@@ -181,10 +181,13 @@ class StarshipAirflow30(StarshipAirflow):
                     [
                         {
                             attr: (
-                                self._get_tags(result.dag_id) if attr == "tags"
-                                else self._get_dag_run_count(result.dag_id) if attr == "dag_run_count"
-                                else self._get_current_dag_version(result.dag_id) if attr == "current_dag_version_id"
-                                else getattr(result, attr_desc["attr"], None)
+                                self._get_tags(result.dag_id)
+                                if attr == "tags"
+                                else (
+                                    self._get_dag_run_count(result.dag_id)
+                                    if attr == "dag_run_count"
+                                    else getattr(result, attr_desc["attr"], None)
+                                )
                             )
                             for attr, attr_desc in self.dag_attrs().items()
                         }
@@ -220,15 +223,6 @@ class StarshipAirflow30(StarshipAirflow):
         except ImportError:
             # DagTag might not be available
             return []
-        except Exception as e:
-            self.session.rollback()
-            raise e
-
-    def _get_current_dag_version(self, dag_id: str):
-        try:
-            from airflow.models.dag_version import DagVersion
-
-            return self.session.query(DagVersion.id).filter(DagVersion.dag_id == dag_id).order_by(DagVersion.version_number.desc()).one()[0]
         except Exception as e:
             self.session.rollback()
             raise e
@@ -1166,6 +1160,19 @@ class StarshipAirflow31(StarshipAirflow30):
 class StarshipAirflow32(StarshipAirflow31):
     """Airflow 3.2 compatibility layer."""
     ...
+
+    @classmethod
+    def dag_attrs(cls) -> "Dict[str, AttrDesc]":
+        return super().dag_attrs() | {
+            "current_dag_version_id": {
+                "attr": None,
+                    "methods": [],
+                    "test_value": None,
+                },
+            }
+        }
+
+
     def get_dags(self):
         from airflow.models import DagModel
 
@@ -1181,13 +1188,10 @@ class StarshipAirflow32(StarshipAirflow31):
                     [
                         {
                             attr: (
-                                self._get_tags(result.dag_id)
-                                if attr == "tags"
-                                else (
-                                    self._get_dag_run_count(result.dag_id)
-                                    if attr == "dag_run_count"
-                                    else getattr(result, attr_desc["attr"], None)
-                                )
+                                self._get_tags(result.dag_id) if attr == "tags"
+                                else self._get_dag_run_count(result.dag_id) if attr == "dag_run_count"
+                                else self._get_current_dag_version(result.dag_id) if attr == "current_dag_version_id"
+                                else getattr(result, attr_desc["attr"], None)
                             )
                             for attr, attr_desc in self.dag_attrs().items()
                         }
@@ -1196,6 +1200,15 @@ class StarshipAirflow32(StarshipAirflow31):
                     default=str,
                 )
             )
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def _get_current_dag_version(self, dag_id: str):
+        try:
+            from airflow.models.dag_version import DagVersion
+
+            return self.session.query(DagVersion.id).filter(DagVersion.dag_id == dag_id).order_by(DagVersion.version_number.desc()).one()[0]
         except Exception as e:
             self.session.rollback()
             raise e

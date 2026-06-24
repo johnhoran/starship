@@ -1152,42 +1152,9 @@ class StarshipAirflow31(StarshipAirflow30):
         # }
         return attrs
 
-class StarshipAirflow32(StarshipAirflow30):
+class StarshipAirflow32(StarshipAirflow31):
     """Airflow 3.2 compatibility layer."""
-
-    @classmethod
-    def pool_attrs(cls) -> "Dict[str, AttrDesc]":
-        attrs = super().pool_attrs()
-        # TODO: add support for Teams? (added in 3.1)
-        # attrs["team_id"] = {
-        #     "attr": "team_id",
-        #     "methods": [("POST", True)],
-        #     "test_value": 123,
-        # }
-        return attrs
-
-    @classmethod
-    def variable_attrs(cls) -> "Dict[str, AttrDesc]":
-        attrs = super().variable_attrs()
-        # TODO: add support for Teams? (added in 3.1)
-        # attrs["team_id"] = {
-        #     "attr": "team_id",
-        #     "methods": [("POST", True)],
-        #     "test_value": 123,
-        # }
-        return attrs
-
-    @classmethod
-    def connection_attrs(cls) -> "Dict[str, AttrDesc]":
-        attrs = super().connection_attrs()
-        # TODO: add support for Teams? (added in 3.1)
-        # attrs["team_id"] = {
-        #     "attr": "team_id",
-        #     "methods": [("POST", True)],
-        #     "test_value": 123,
-        # }
-        return attrs
-
+    ...
 
 class StarshipCompatabilityLayer:
     """StarshipCompatabilityLayer is a factory class that returns the correct StarshipAirflow class for a version

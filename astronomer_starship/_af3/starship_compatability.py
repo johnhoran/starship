@@ -1166,10 +1166,9 @@ class StarshipAirflow32(StarshipAirflow31):
         return super().dag_attrs() | {
             "current_dag_version_id": {
                 "attr": None,
-                    "methods": [],
-                    "test_value": None,
-                },
-            }
+                "methods": [],
+                "test_value": None,
+            },
         }
 
 

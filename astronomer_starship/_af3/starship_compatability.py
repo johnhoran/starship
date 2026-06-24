@@ -1207,7 +1207,7 @@ class StarshipAirflow32(StarshipAirflow31):
         try:
             from airflow.models.dag_version import DagVersion
 
-            return self.session.query(DagVersion.id).filter(DagVersion.dag_id == dag_id).order_by(DagVersion.version_number.desc()).one()[0]
+            return self.session.query(DagVersion.id).filter(DagVersion.dag_id == dag_id).order_by(DagVersion.version_number.desc()).limit(1).one()[0]
         except Exception as e:
             self.session.rollback()
             raise e

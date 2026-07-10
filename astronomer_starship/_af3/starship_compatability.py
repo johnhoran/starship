@@ -1159,7 +1159,7 @@ class StarshipAirflow31(StarshipAirflow30):
 
 class StarshipAirflow32(StarshipAirflow31):
     """Airflow 3.2 compatibility layer."""
-    ...
+
 
     @classmethod
     def dag_attrs(cls) -> "Dict[str, AttrDesc]":
@@ -1212,6 +1212,8 @@ class StarshipAirflow32(StarshipAirflow31):
             self.session.rollback()
             raise e
 
+class StarshipAirflow33(StarshipAirflow32):
+    ...
 class StarshipCompatabilityLayer:
     """StarshipCompatabilityLayer is a factory class that returns the correct StarshipAirflow class for a version
 
@@ -1236,5 +1238,7 @@ class StarshipCompatabilityLayer:
                 return StarshipAirflow31()
             elif minor == 2:
                 return StarshipAirflow32()
+            elif minor == 3:
+                return StarshipAirflow33()
 
         raise RuntimeError(f"Unsupported Airflow Version: {airflow_version}")

@@ -126,10 +126,14 @@ async def wrap_response(result):
 async def starship_route(request: Request) -> StarshipRoute:
     """async 'dependable' to build StarshipRoute from Request"""
     body = await request.body()
+    try:
+        json_body = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        json_body = {}
     return StarshipRoute(
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
-        json=await request.json() if body else {},
+        json=json_body,
         request=request,
     )
 

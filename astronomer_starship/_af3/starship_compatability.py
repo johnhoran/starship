@@ -1328,7 +1328,7 @@ class StarshipAirflow33(StarshipAirflow32):
     def get_task_log(self, **kwargs):
         """Get the log for a task instance"""
         from airflow.providers.common.compat.sdk import ObjectStoragePath
-        from flask import Response
+        from fastapi.responses import StreamingResponse
 
         try:
             path, conn_id = self._task_log_path(**kwargs)
@@ -1347,15 +1347,14 @@ class StarshipAirflow33(StarshipAirflow32):
                         yield data
 
                         offset += block_size
-
-            return Response(generator(), mimetype="text/plain")
+            return StreamingResponse(generator(), media_type="text/plain")
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
     def set_task_log(self, **kwargs):
         """Set the log for a task instance"""
         from airflow.providers.common.compat.sdk import ObjectStoragePath
-        from flask import request
+        from fastapi import Request
 
         path, conn_id = self._task_log_path(**kwargs)
         remote_path = ObjectStoragePath(path, conn_id=conn_id)
@@ -1366,14 +1365,17 @@ class StarshipAirflow33(StarshipAirflow32):
         # as it requires bucket level permissions.
         if conn_id is None:
             remote_path.parent.mkdir(exist_ok=True, parents=True)
+        request = kwargs["request"]
 
-        with remote_path.open("wb") as f:
-            while True:
-                data = request.stream.read(block_size)
-                logger.debug("Read %d bytes", len(data))
-                if not data:
-                    break
-                f.write(data)
+
+        # with remote_path.open("wb") as f:
+        #     while True:
+
+        #         data = request.stream.read(block_size)
+        #         logger.debug("Read %d bytes", len(data))
+        #         if not data:
+        #             break
+        #         f.write(data)
 
     def delete_task_log(self, **kwargs):
         """Delete the log for a task instance"""

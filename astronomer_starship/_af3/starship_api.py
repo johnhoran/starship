@@ -23,7 +23,7 @@ class StarshipRoute:
     method: str
     args: dict
     json: dict
-    stream: Any
+    request: Request
 
     def __call__(  # noqa: C901
         self,
@@ -57,7 +57,7 @@ class StarshipRoute:
                 from sqlalchemy.exc import DataError, IntegrityError, StatementError
 
                 try:
-                    res = post(stream=self.stream, **kwargs)
+                    res = post(request=self.request, **kwargs)
                 except IntegrityError as e:
                     return JSONResponse(
                         {
@@ -121,7 +121,7 @@ async def starship_route(request: Request) -> StarshipRoute:
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
         json=await request.json() if body else {},
-        stream=request.stream,
+        request=request,
     )
 
 

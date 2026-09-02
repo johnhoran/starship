@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.security import requires_access_configuration
@@ -23,6 +23,7 @@ class StarshipRoute:
     method: str
     args: dict
     json: dict
+    stream: Any
 
     def __call__(  # noqa: C901
         self,

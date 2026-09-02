@@ -1368,11 +1368,10 @@ class StarshipAirflow33(StarshipAirflow32):
             remote_path.parent.mkdir(exist_ok=True, parents=True)
 
 
+        with remote_path.open("wb") as f:
+            async for chunk in request.stream():
+                f.write(chunk)
 
-        async for chunk in request.stream():
-            # chunk is a `bytes` object. Process it here.
-            # Example: print(f"Received chunk of size {len(chunk)}")
-            pass
 
         return {"message": "Data stream processed successfully"}
 

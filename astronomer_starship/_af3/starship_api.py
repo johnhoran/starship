@@ -41,7 +41,6 @@ class StarshipRoute:
                     request_method=self.method,
                     args=self.args,
                     json=self.json,
-                    stream=self.stream,
                 )
                 if kwargs_fn
                 else {}
@@ -58,7 +57,7 @@ class StarshipRoute:
                 from sqlalchemy.exc import DataError, IntegrityError, StatementError
 
                 try:
-                    res = post(**kwargs)
+                    res = post(stream=self.stream, **kwargs)
                 except IntegrityError as e:
                     return JSONResponse(
                         {

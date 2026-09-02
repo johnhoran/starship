@@ -41,6 +41,7 @@ class StarshipRoute:
                     request_method=self.method,
                     args=self.args,
                     json=self.json,
+                    stream=self.stream,
                 )
                 if kwargs_fn
                 else {}

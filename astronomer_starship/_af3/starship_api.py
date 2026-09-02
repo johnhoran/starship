@@ -126,15 +126,12 @@ async def wrap_response(result):
 async def starship_route(request: Request) -> StarshipRoute:
     """async 'dependable' to build StarshipRoute from Request"""
     body = await request.body()
-    resp = StarshipRoute(
+    return StarshipRoute(
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
         json=await request.json() if body else {},
         request=request,
     )
-    if inspect.iscoroutine(resp):
-        return await resp
-    return resp
 
 
 async def starship_compat() -> StarshipAirflow:
@@ -283,16 +280,19 @@ class StarshipApi(FastAPI):
 
     @router.api_route("/task_log", methods=["GET", "POST", "DELETE"])
     @staticmethod
-    def task_logs(
+    async def task_logs(
         starship_route: Annotated[StarshipRoute, Depends(starship_route)],
         starship_compat: Annotated[StarshipAirflow, Depends(starship_compat)],
     ):
-        return starship_route(
+        route = starship_route(
             get=starship_compat.get_task_log,
             post=starship_compat.set_task_log,
             delete=starship_compat.delete_task_log,
             kwargs_fn=partial(get_kwargs_fn, attrs=starship_compat.task_log_attrs()),
         )
+        if inspect.iscoroutine(route):
+            return await route
+        return route
 
     @router.api_route("/xcom", methods=["GET", "POST", "DELETE"])
     @staticmethod

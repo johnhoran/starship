@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
+import inspect
 
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.security import requires_access_configuration
@@ -96,6 +97,10 @@ class StarshipRoute:
 
             if res is None:
                 return None
+            if res is None:
+                return None
+            if inspect.iscoroutine(res):
+                return wrap_response(res)
 
             return JSONResponse(res)
         except HttpError as e:
@@ -113,16 +118,23 @@ class StarshipRoute:
                 500,
             )
 
+async def wrap_response(result):
+    response = await result
+    return JSONResponse(response)
+
 
 async def starship_route(request: Request) -> StarshipRoute:
     """async 'dependable' to build StarshipRoute from Request"""
     body = await request.body()
-    return StarshipRoute(
+    resp = StarshipRoute(
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
         json=await request.json() if body else {},
         request=request,
     )
+    if inspect.iscoroutine(resp):
+        return await resp
+    return resp
 
 
 async def starship_compat() -> StarshipAirflow:

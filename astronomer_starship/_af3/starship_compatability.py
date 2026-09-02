@@ -5,6 +5,7 @@ from datetime import timezone
 from typing import TYPE_CHECKING
 import os
 
+from fastapi import Request
 from airflow.providers.common.compat.sdk import conf
 from astronomer_starship.common import (
     BaseStarshipAirflow,
@@ -1351,10 +1352,10 @@ class StarshipAirflow33(StarshipAirflow32):
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
-    def set_task_log(self, **kwargs):
+    async def set_task_log(self, request: Request, **kwargs):
         """Set the log for a task instance"""
         from airflow.providers.common.compat.sdk import ObjectStoragePath
-        from fastapi import Request
+
 
         path, conn_id = self._task_log_path(**kwargs)
         remote_path = ObjectStoragePath(path, conn_id=conn_id)
@@ -1365,8 +1366,15 @@ class StarshipAirflow33(StarshipAirflow32):
         # as it requires bucket level permissions.
         if conn_id is None:
             remote_path.parent.mkdir(exist_ok=True, parents=True)
-        request = kwargs["request"]
 
+
+
+        async for chunk in request.stream():
+            # chunk is a `bytes` object. Process it here.
+            # Example: print(f"Received chunk of size {len(chunk)}")
+            pass
+
+        return {"message": "Data stream processed successfully"}
 
         # with remote_path.open("wb") as f:
         #     while True:

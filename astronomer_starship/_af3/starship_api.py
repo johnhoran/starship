@@ -120,6 +120,7 @@ async def starship_route(request: Request) -> StarshipRoute:
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
         json=await request.json() if body else {},
+        stream=request.stream,
     )
 
 

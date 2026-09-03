@@ -1353,27 +1353,44 @@ class StarshipAirflow33(StarshipAirflow32):
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
     async def set_task_log(self, request: Request, **kwargs):
-        """Set the log for a task instance"""
-        from airflow.providers.common.compat.sdk import ObjectStoragePath
-
+        import smart_open
 
         path, conn_id = self._task_log_path(**kwargs)
-        remote_path = ObjectStoragePath(path, conn_id=conn_id)
-        block_size = int(kwargs.get("block_size", 1024 * 1024))
 
-        # If local file system, ensure the parent directories exist.
-        # Causes problems with remote storage (where it is not needed),
-        # as it requires bucket level permissions.
-        if conn_id is None:
-            remote_path.parent.mkdir(exist_ok=True, parents=True)
+        open_kwargs = {}
+        if path.startswith("s3://"):
+            from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+            session = S3Hook(aws_conn_id=conn_id).get_session()
+            open_kwargs["transport_params"] = {"session": session}
 
-
-        with remote_path.open("wb") as f:
+        with smart_open.open(path, "wb", **open_kwargs) as f:
             async for chunk in request.stream():
                 f.write(chunk)
 
 
-        return {"message": "Data stream processed successfully"}
+
+    # async def set_task_log(self, request: Request, **kwargs):
+    #     """Set the log for a task instance"""
+    #     from airflow.providers.common.compat.sdk import ObjectStoragePath
+
+
+    #     path, conn_id = self._task_log_path(**kwargs)
+    #     remote_path = ObjectStoragePath(path, conn_id=conn_id)
+    #     block_size = int(kwargs.get("block_size", 1024 * 1024))
+
+    #     # If local file system, ensure the parent directories exist.
+    #     # Causes problems with remote storage (where it is not needed),
+    #     # as it requires bucket level permissions.
+    #     if conn_id is None:
+    #         remote_path.parent.mkdir(exist_ok=True, parents=True)
+
+
+    #     with remote_path.open("wb") as f:
+    #         async for chunk in request.stream():
+    #             f.write(chunk)
+
+
+    #     return {"message": "Data stream processed successfully"}
 
         # with remote_path.open("wb") as f:
         #     while True:

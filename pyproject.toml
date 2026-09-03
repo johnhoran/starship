@@ -62,6 +62,7 @@ exclude = [
 [project.optional-dependencies]
 provider = [
     "apache-airflow-providers-http",
+    "smart-open",
 ]
 
 dev = [

@@ -1367,9 +1367,10 @@ class StarshipAirflow33(StarshipAirflow32):
             from pathlib import Path
             Path(path).parent.mkdir(exist_ok=True, parents=True)
 
-        with smart_open.open(path, "wb", encoding="iso-8859-1", **open_kwargs) as f:
+        with smart_open.open(path, "w", encoding="iso-8859-1", **open_kwargs) as f:
             async for chunk in request.stream():
-                f.write(chunk)
+                text = chunk.decode("utf-8")  # Must match the sender's actual encoding.
+                f.write(text)
 
 
 

@@ -1361,7 +1361,8 @@ class StarshipAirflow33(StarshipAirflow32):
         if path.startswith("s3://"):
             from airflow.providers.amazon.aws.hooks.s3 import S3Hook
             session = S3Hook(aws_conn_id=conn_id).get_session()
-            open_kwargs["transport_params"] = {"session": session}
+            client = session.client("s3")
+            open_kwargs["transport_params"] = {"client": client}
 
         if conn_id is None:
             from pathlib import Path

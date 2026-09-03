@@ -1363,6 +1363,10 @@ class StarshipAirflow33(StarshipAirflow32):
             session = S3Hook(aws_conn_id=conn_id).get_session()
             open_kwargs["transport_params"] = {"session": session}
 
+        if conn_id is None:
+            from pathlib import Path
+            Path(path).parent.mkdir(exist_ok=True, parents=True)
+
         with smart_open.open(path, "wb", **open_kwargs) as f:
             async for chunk in request.stream():
                 f.write(chunk)

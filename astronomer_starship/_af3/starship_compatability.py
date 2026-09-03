@@ -1369,9 +1369,10 @@ class StarshipAirflow33(StarshipAirflow32):
             Path(path).parent.mkdir(exist_ok=True, parents=True)
 
         with smart_open.open(path, "w", encoding="iso-8859-1", **open_kwargs) as f:
-            async for chunk in request.stream():
-                text = chunk.decode("utf-8")  # Must match the sender's actual encoding.
-                f.write(text)
+            text = (await request.body()).decode("utf-8")  # Must match the sender's actual encoding.
+            written = f.write(text)
+
+        return {"message": f"Data stream processed successfully, wrote {written} bytes"}
 
 
 

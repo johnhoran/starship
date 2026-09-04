@@ -147,7 +147,7 @@ async def starship_route(request: Request) -> StarshipRoute:
         json=await request.json() if body else {},
     )
 
-async def starship_route_async(request: Request) -> StarshipRoute:
+def starship_route_async(request: Request) -> StarshipRoute:
     return StarshipRoute(
         method=request.method,
         args=(request.query_params if request.method in ["GET", "POST", "DELETE", "PUT", "HEAD"] else {}),
@@ -301,11 +301,11 @@ class StarshipApi(FastAPI):
 
     @router.api_route("/task_log", methods=["GET", "PUT", "DELETE", "HEAD"])
     @staticmethod
-    def task_logs(
+    async def task_logs(
         starship_route: Annotated[StarshipRoute, Depends(starship_route_async)],
         starship_compat: Annotated[StarshipAirflow, Depends(starship_compat)],
     ):
-        return starship_route(
+        return await starship_route(
             get=starship_compat.get_task_log,
             put=starship_compat.set_task_log,
             delete=starship_compat.delete_task_log,

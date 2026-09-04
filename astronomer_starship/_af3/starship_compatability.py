@@ -1453,7 +1453,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
             stmt = (
                 update(table)
-                .where(table.c.dag_id == dag_id and table.c.run_id == run_id and table.c.log_template_id is None)
+                .where(table.c.dag_id == dag_id, table.c.run_id == run_id, table.c.log_template_id == None)
                 .values(log_template_id=subq)
             )
 

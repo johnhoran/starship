@@ -23,6 +23,7 @@ class StarshipRoute:
     method: str
     args: dict
     json: dict
+    request: Request | None = None
 
     def __call__(  # noqa: C901
         self,
@@ -118,8 +119,15 @@ async def starship_route(request: Request) -> StarshipRoute:
     body = await request.body()
     return StarshipRoute(
         method=request.method,
-        args=(request.query_params if request.method in ["GET", "POST", "DELETE"] else {}),
+        args=(request.query_params if request.method in ["GET", "POST", "DELETE", "PUT", "HEAD"] else {}),
         json=await request.json() if body else {},
+    )
+
+async def starship_route_async(request: Request) -> StarshipRoute:
+    return StarshipRoute(
+        method=request.method,
+        args=(request.query_params if request.method in ["GET", "POST", "DELETE", "PUT", "HEAD"] else {}),
+        request=request,
     )
 
 
@@ -267,16 +275,17 @@ class StarshipApi(FastAPI):
             kwargs_fn=partial(get_kwargs_fn, attrs=starship_compat.task_instance_history_attrs()),
         )
 
-    @router.api_route("/task_log", methods=["GET", "POST", "DELETE"])
+    @router.api_route("/task_log", methods=["GET", "PUT", "DELETE", "HEAD"])
     @staticmethod
     def task_logs(
-        starship_route: Annotated[StarshipRoute, Depends(starship_route)],
+        starship_route: Annotated[StarshipRoute, Depends(starship_route_async)],
         starship_compat: Annotated[StarshipAirflow, Depends(starship_compat)],
     ):
         return starship_route(
             get=starship_compat.get_task_log,
-            post=starship_compat.set_task_log,
+            put=starship_compat.set_task_log,
             delete=starship_compat.delete_task_log,
+            head=starship_compat.head_task_log,
             kwargs_fn=partial(get_kwargs_fn, attrs=starship_compat.task_log_attrs()),
         )
 

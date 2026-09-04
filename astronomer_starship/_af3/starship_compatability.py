@@ -3,11 +3,14 @@ import json
 import logging
 from datetime import timezone
 from typing import TYPE_CHECKING
+import os
 
 from astronomer_starship.common import (
     BaseStarshipAirflow,
     generic_delete,
     results_to_list_via_attrs,
+    ConflictError,
+    NotFoundError,
 )
 
 if TYPE_CHECKING:
@@ -1278,3 +1281,187 @@ class StarshipCompatabilityLayer:
                 return StarshipAirflow33()
 
         raise RuntimeError(f"Unsupported Airflow Version: {airflow_version}")
+
+
+    @classmethod
+    def task_log_attrs(cls) -> "Dict[str, AttrDesc]":
+        return {
+            "dag_id": {
+                "attr": "dag_id",
+                "methods": [
+                    ("GET", True),
+                    ("PUT", True),
+                    ("DELETE", True),
+                    ("HEAD", True),
+                ],
+                "test_value": "dag_0",
+            },
+            "run_id": {
+                "attr": "run_id",
+                "methods": [
+                    ("GET", True),
+                    ("PUT", True),
+                    ("DELETE", True),
+                    ("HEAD", True),
+                ],
+                "test_value": "manual__1970-01-01T00:00:00+00:00",
+            },
+            "task_id": {
+                "attr": "task_id",
+                "methods": [
+                    ("GET", True),
+                    ("PUT", True),
+                    ("DELETE", True),
+                    ("HEAD", True),
+                ],
+                "test_value": "task_id",
+            },
+            "map_index": {
+                "attr": "map_index",
+                "methods": [
+                    ("GET", True),
+                    ("PUT", True),
+                    ("DELETE", True),
+                    ("HEAD", True),
+                ],
+                "test_value": -1,
+            },
+            "try_number": {
+                "attr": "try_number",
+                "methods": [
+                    ("GET", True),
+                    ("PUT", True),
+                    ("DELETE", True),
+                    ("HEAD", True),
+                ],
+                "test_value": 0,
+            },
+            "block_size": {
+                "attr": "block_size",
+                "methods": [
+                    ("GET", False),
+                    ("PUT", False),
+                ],
+                "test_value": 1024 * 1024,
+            },
+        }
+
+    @classmethod
+    def _task_log_path(
+        cls,
+        *,
+        dag_id,
+        run_id,
+        task_id,
+        map_index,
+        try_number,
+        **_,
+    ) -> tuple[str, str | None]:
+        """Get the path to the task log file and the connection ID for remote storage."""
+        astronomer_environment = os.getenv("ASTRONOMER_ENVIRONMENT")
+
+        if astronomer_environment == "cloud":
+            # Astro Hosted
+            base_folder = os.getenv("AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER")
+            conn_id = None
+            for key in [
+                "AIRFLOW_CONN_ASTRO_GCS_LOGGING",
+                "AIRFLOW_CONN_ASTRO_AZURE_LOGS",
+                "AIRFLOW_CONN_ASTRO_S3_LOGGING",
+            ]:
+                conn_id = os.getenv(key)
+                if conn_id is not None:
+                    break
+
+            if conn_id is None:
+                raise ConflictError("No remote logging connection found.")
+        elif astronomer_environment == "local":
+            # Local astro dev environment
+            base_folder = "/usr/local/airflow/logs"
+            conn_id = None
+        else:
+            raise ConflictError("Task logs are only supported on Astronomer environments.")
+
+        path_components = (
+            [
+                f"dag_id={dag_id}",
+                f"run_id={run_id}",
+                f"task_id={task_id}",
+                f"attempt={try_number}.log",
+            ]
+            if map_index == "-1"
+            else [
+                f"dag_id={dag_id}",
+                f"run_id={run_id}",
+                f"task_id={task_id}",
+                f"map_index={map_index}",
+                f"attempt={try_number}.log",
+            ]
+        )
+        # ObjectStoragePath could be used to build the full path, but there seems to be a problem
+        # where the connection ID duplicates with each path segment.
+        # We also want to have access to the path only for logging purposes.
+        path = os.path.join(base_folder, *path_components)
+        return path, conn_id
+
+    def get_task_log(self, **kwargs):
+        """Get the log for a task instance"""
+        from airflow.io.path import ObjectStoragePath
+        from flask import Response
+
+        try:
+            path, conn_id = self._task_log_path(**kwargs)
+            remote_path = ObjectStoragePath(path, conn_id=conn_id)
+            size = remote_path.size()
+            logger.debug("Task log at %s has %d bytes", path, size)
+            block_size = int(kwargs.get("block_size", 1024 * 1024))
+
+            def generator():
+                offset = 0
+
+                with remote_path.open("rb") as f:
+                    while offset < size:
+                        data = f.read(block_size)
+                        logger.info("Yielding %d bytes at offset %d", len(data), offset)
+                        yield data
+
+                        offset += block_size
+
+            return Response(generator(), mimetype="text/plain")
+        except FileNotFoundError as e:
+            raise NotFoundError(f"Task log at {path} not found: {e}") from e
+
+    def set_task_log(self, **kwargs):
+        """Set the log for a task instance"""
+        from airflow.io.path import ObjectStoragePath
+        from flask import request
+
+        path, conn_id = self._task_log_path(**kwargs)
+        remote_path = ObjectStoragePath(path, conn_id=conn_id)
+        block_size = int(kwargs.get("block_size", 1024 * 1024))
+
+        # If local file system, ensure the parent directories exist.
+        # Causes problems with remote storage (where it is not needed),
+        # as it requires bucket level permissions.
+        if conn_id is None:
+            remote_path.parent.mkdir(exist_ok=True, parents=True)
+
+        with remote_path.open("wb") as f:
+            while True:
+                data = request.stream.read(block_size)
+                logger.debug("Read %d bytes", len(data))
+                if not data:
+                    break
+                f.write(data)
+
+    def delete_task_log(self, **kwargs):
+        """Delete the log for a task instance"""
+        from airflow.io.path import ObjectStoragePath
+
+        try:
+            path, conn_id = self._task_log_path(**kwargs)
+            remote_path = ObjectStoragePath(path, conn_id=conn_id)
+
+            remote_path.unlink()
+        except FileNotFoundError as e:
+            raise NotFoundError(f"Task log at {path} not found: {e}") from e

@@ -480,6 +480,9 @@ class BaseStarshipAirflow:
     def delete_task_log(self, **kwargs):
         raise NotImplementedError("Subclasses must implement delete_task_log method")
 
+    def head_task_log(self, **kwargs):
+        raise NotImplementedError("Subclasses must implement head_task_log method")
+
     @classmethod
     def xcom_attrs(cls) -> "Dict[str, AttrDesc]":
         raise NotImplementedError("Subclasses must implement xcom_attrs method")

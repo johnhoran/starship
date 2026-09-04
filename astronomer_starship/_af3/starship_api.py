@@ -8,7 +8,7 @@ from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.security import requires_access_configuration
 from airflow.plugins_manager import AirflowPlugin
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import inspect
 
 from astronomer_starship._af3.starship_compatability import StarshipAirflow, StarshipCompatabilityLayer
@@ -102,7 +102,7 @@ class StarshipRoute:
             if res is None:
                 return None
             if inspect.iscoroutine(res):
-                return jsonresponse_async(res)
+                return response_async(res)
 
             return JSONResponse(res)
         except HttpError as e:
@@ -120,9 +120,11 @@ class StarshipRoute:
                 500,
             )
 
-async def jsonresponse_async(result):
+async def response_async(result):
     try:
         response = await result
+        if isinstance(response, Response):
+            return response
         return JSONResponse(response)
     except HttpError as e:
         return JSONResponse({"error": e.msg}, e.status_code)

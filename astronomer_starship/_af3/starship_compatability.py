@@ -1369,31 +1369,36 @@ class StarshipAirflow33(StarshipAirflow32):
         path = os.path.join(base_folder, *path_components)
         return path, conn_id
 
-    async def get_task_log(self, **kwargs):
-        """Get the log for a task instance"""
-        from airflow.providers.common.compat.sdk import ObjectStoragePath
-        from fastapi.responses import StreamingResponse
+    )
 
-        try:
-            path, conn_id = self._task_log_path(**kwargs)
-            remote_path = ObjectStoragePath(path, conn_id=conn_id)
-            size = remote_path.size()
-            logger.debug("Task log at %s has %d bytes", path, size)
-            block_size = int(kwargs.get("block_size", 1024 * 1024))
+    async def get_task_log(self, request: Request, **kwargs):
+        from fastapi.responses import PlainTextResponse
+        body = await asyncio.to_thread(
+            self._sync_get_task_log,
+            **kwargs
+        )
 
-            def generator():
-                offset = 0
+        return PlainTextResponse(body)
 
-                with remote_path.open("rb") as f:
-                    while offset < size:
-                        data = f.read(block_size)
-                        logger.info("Yielding %d bytes at offset %d", len(data), offset)
-                        yield data
+    def _sync_get_task_log(self, dag_id: str, run_id: str, **kwargs)):
+        import smart_open
 
-                        offset += block_size
-            return StreamingResponse(generator(), media_type="text/plain")
-        except FileNotFoundError as e:
-            raise NotFoundError(f"Task log at {path} not found: {e}") from e
+        path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
+
+        open_kwargs = {}
+        if path.startswith("s3://"):
+            from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+            session = S3Hook(aws_conn_id=conn_id).get_session()
+            client = session.client("s3")
+            open_kwargs["transport_params"] = {"client": client}
+
+        if conn_id is None:
+            Path(path).parent.mkdir(exist_ok=True, parents=True)
+
+        with smart_open.open(path, "rb", **open_kwargs) as f:
+            data = f.read()
+
+        return data
 
     async def set_task_log(self, request: Request, **kwargs):
         body = await request.body()
@@ -1404,7 +1409,7 @@ class StarshipAirflow33(StarshipAirflow32):
             **kwargs
         )
 
-    def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str,**kwargs):
+    def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, **kwargs):
         import smart_open
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
 

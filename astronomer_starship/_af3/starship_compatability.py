@@ -1379,7 +1379,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
         return PlainTextResponse(body)
 
-    def _sync_get_task_log(self, dag_id: str, run_id: str, **kwargs)):
+    def _sync_get_task_log(self, dag_id: str, run_id: str, **kwargs):
         import smart_open
 
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)

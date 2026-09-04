@@ -13,6 +13,7 @@ from astronomer_starship.common import (
     ConflictError,
     NotFoundError,
 )
+import asyncio
 
 if TYPE_CHECKING:
     from typing import Dict, Union
@@ -1399,7 +1400,16 @@ class StarshipAirflow33(StarshipAirflow32):
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
-    async def set_task_log(self, request: Request, dag_id: str, run_id: str,**kwargs):
+    async def set_task_log(self, request: Request, **kwargs):
+        body = await request.body()
+
+        return await asyncio.to_thread(
+            self.sync_set_task_log,
+            body=body,
+            **kwargs
+        )
+
+    def sync_set_task_log(self, body: bytes, dag_id: str, run_id: str,**kwargs):
         import smart_open
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
 
@@ -1415,9 +1425,8 @@ class StarshipAirflow33(StarshipAirflow32):
         if conn_id is None:
             Path(path).parent.mkdir(exist_ok=True, parents=True)
 
-        with smart_open.open(path, "w", encoding="iso-8859-1", **open_kwargs) as f:
-            text = (await request.body()).decode("utf-8")  # Must match the sender's actual encoding.
-            written = f.write(text)
+        with smart_open.open(path, "wb", **open_kwargs) as f:
+            written = f.write(body)
 
         return {"message": f"Data stream processed successfully, wrote {written} bytes"}
 

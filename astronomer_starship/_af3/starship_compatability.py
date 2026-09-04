@@ -165,7 +165,7 @@ class StarshipAirflow30(StarshipAirflow):
             },
         }
 
-    def get_dags(self, **kwargs):
+    def get_dags(self):
         from airflow.models import DagModel
 
         try:
@@ -199,7 +199,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_dag_is_paused(self, dag_id: str, is_paused: bool, **kwargs):
+    def set_dag_is_paused(self, dag_id: str, is_paused: bool):
         from airflow.models import DagModel
         from sqlalchemy import update
 
@@ -382,7 +382,7 @@ class StarshipAirflow30(StarshipAirflow):
             },
         }
 
-    def get_dag_runs(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs) -> dict:
+    def get_dag_runs(self, dag_id: str, offset: int = 0, limit: int = 10) -> dict:
         from sqlalchemy import MetaData, String, desc, select
 
         try:
@@ -416,13 +416,13 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_dag_runs(self, dag_runs: list, **kwargs):
+    def set_dag_runs(self, dag_runs: list):
         dag_id = dag_runs[0]["dag_id"]
         dag_runs = self.insert_directly("dag_run", dag_runs)
         return {"dag_runs": dag_runs, "dag_run_count": self._get_dag_run_count(dag_id)}
 
     def delete_dag_runs(self, **kwargs):
-        attrs = {self.dag_runs_attrs()[k]["attr"]: v for k, v in kwargs.items() if k is not "request"}
+        attrs = {self.dag_runs_attrs()[k]["attr"]: v for k, v in kwargs.items()}
         return generic_delete(self.session, "airflow.models.DagRun", **attrs)
 
     @classmethod
@@ -650,7 +650,7 @@ class StarshipAirflow30(StarshipAirflow):
             # Note: serialization issues: next_method and next_kwargs intentionally omitted
         }
 
-    def get_task_instances(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs):
+    def get_task_instances(self, dag_id: str, offset: int = 0, limit: int = 10):
         import json
 
         from airflow.models import TaskInstance
@@ -701,7 +701,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_task_instances(self, task_instances: list, **kwargs):
+    def set_task_instances(self, task_instances: list):
         task_instances = self.insert_directly("task_instance", task_instances)
 
         # populate dag_version_id
@@ -940,7 +940,7 @@ class StarshipAirflow30(StarshipAirflow):
             # Note: serialization issues: next_method and next_kwargs intentionally omitted
         }
 
-    def get_task_instance_history(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs):
+    def get_task_instance_history(self, dag_id: str, offset: int = 0, limit: int = 10):
         from airflow.models import DagRun
         from airflow.models.taskinstancehistory import TaskInstanceHistory
         from sqlalchemy import desc
@@ -973,7 +973,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_task_instance_history(self, task_instances: list, **kwargs):
+    def set_task_instance_history(self, task_instances: list):
         task_instances = self.insert_directly("task_instance_history", task_instances)
         return {"task_instances": task_instances}
 
@@ -1042,7 +1042,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def get_latest_dag_version_id(self, dag_id: str, **kwargs):
+    def get_latest_dag_version_id(self, dag_id: str):
         from sqlalchemy import MetaData, desc, select
 
         try:
@@ -1064,7 +1064,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def update_dag_version_id(self, dag_id: str, dag_version_id: str = None, **kwargs):
+    def update_dag_version_id(self, dag_id: str, dag_version_id: str = None):
         """
         Update dag_version_id(FK) for task instances AND dag runs that have NULL values.
         Update created_dag_version_id on dag_run records so the UI can properly display them.

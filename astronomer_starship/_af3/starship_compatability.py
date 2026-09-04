@@ -1393,9 +1393,11 @@ class StarshipAirflow33(StarshipAirflow32):
 
         if conn_id is None:
             Path(path).parent.mkdir(exist_ok=True, parents=True)
-
-        with smart_open.open(path, "rb", **open_kwargs) as f:
-            data = f.read()
+        try:
+            with smart_open.open(path, "rb", **open_kwargs) as f:
+                data = f.read()
+        except FileNotFoundError:
+            raise NotFoundError(f"Task log at {path} not found")
 
         return data
 

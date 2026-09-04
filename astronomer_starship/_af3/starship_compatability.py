@@ -1399,10 +1399,11 @@ class StarshipAirflow33(StarshipAirflow32):
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
-    async def set_task_log(self, request: Request, **kwargs):
+    async def set_task_log(self, request: Request, dag_id: str, run_id: str,**kwargs):
         import smart_open
+        self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
 
-        path, conn_id = self._task_log_path(**kwargs)
+        path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
 
         open_kwargs = {}
         if path.startswith("s3://"):
@@ -1418,8 +1419,7 @@ class StarshipAirflow33(StarshipAirflow32):
             text = (await request.body()).decode("utf-8")  # Must match the sender's actual encoding.
             written = f.write(text)
 
-        log_id = self._fix_dagrun_log_config()
-        return {"message": f"Data stream processed successfully, wrote {written} bytes, log_id={log_id}"}
+        return {"message": f"Data stream processed successfully, wrote {written} bytes"}
 
     async def delete_task_log(self, **kwargs):
         """Delete the log for a task instance"""
@@ -1433,20 +1433,35 @@ class StarshipAirflow33(StarshipAirflow32):
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
-    def _fix_dagrun_log_config(self):
+    def _fix_dagrun_log_config(self, dag_id: str, run_id: str):
+        from sqlalchemy import MetaData, select, text, update
 
-        from sqlalchemy import text
+        try:
+            engine = self.session.get_bind()
+            metadata = MetaData()
+            metadata.reflect(engine, only=["dag_run"])
+            table = metadata.tables["dag_run"]
 
-        log_id = self.session.execute(
-            text("""
-                SELECT id
+            subq = select(
+                text("""
+                id
                 FROM log_template
                 WHERE filename='dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number }}.log'
                 ORDER BY id DESC LIMIT 1
-            """)
-        ).scalar()
+                """)
+            ).scalar_subquery()
 
-        return log_id
+            stmt = (
+                update(table)
+                .where(table.c.dag_id == dag_id and table.c.run_id == run_id and table.c.log_template_id is None)
+                .values(log_template_id=subq)
+            )
+
+            self.session.execute(stmt)
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            raise e
 
 
 

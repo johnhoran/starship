@@ -1455,7 +1455,7 @@ class StarshipAirflow33(StarshipAirflow32):
         if obj is None:
             raise NotFoundError()
 
-        return {}
+        return {"message": f"Head object response {obj}"}
 
     def _fix_dagrun_log_config(self, dag_id: str, run_id: str):
         from sqlalchemy import MetaData, select, text, update

@@ -1369,7 +1369,6 @@ class StarshipAirflow33(StarshipAirflow32):
         path = os.path.join(base_folder, *path_components)
         return path, conn_id
 
-    )
 
     async def get_task_log(self, request: Request, **kwargs):
         from fastapi.responses import PlainTextResponse

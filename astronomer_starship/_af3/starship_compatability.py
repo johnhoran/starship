@@ -165,7 +165,7 @@ class StarshipAirflow30(StarshipAirflow):
             },
         }
 
-    def get_dags(self):
+    def get_dags(self, **kwargs):
         from airflow.models import DagModel
 
         try:
@@ -199,7 +199,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_dag_is_paused(self, dag_id: str, is_paused: bool):
+    def set_dag_is_paused(self, dag_id: str, is_paused: bool, **kwargs):
         from airflow.models import DagModel
         from sqlalchemy import update
 
@@ -382,7 +382,7 @@ class StarshipAirflow30(StarshipAirflow):
             },
         }
 
-    def get_dag_runs(self, dag_id: str, offset: int = 0, limit: int = 10) -> dict:
+    def get_dag_runs(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs) -> dict:
         from sqlalchemy import MetaData, String, desc, select
 
         try:
@@ -416,13 +416,13 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_dag_runs(self, dag_runs: list):
+    def set_dag_runs(self, dag_runs: list, **kwargs):
         dag_id = dag_runs[0]["dag_id"]
         dag_runs = self.insert_directly("dag_run", dag_runs)
         return {"dag_runs": dag_runs, "dag_run_count": self._get_dag_run_count(dag_id)}
 
     def delete_dag_runs(self, **kwargs):
-        attrs = {self.dag_runs_attrs()[k]["attr"]: v for k, v in kwargs.items()}
+        attrs = {self.dag_runs_attrs()[k]["attr"]: v for k, v in kwargs.items() if k is not "request"}
         return generic_delete(self.session, "airflow.models.DagRun", **attrs)
 
     @classmethod
@@ -650,7 +650,7 @@ class StarshipAirflow30(StarshipAirflow):
             # Note: serialization issues: next_method and next_kwargs intentionally omitted
         }
 
-    def get_task_instances(self, dag_id: str, offset: int = 0, limit: int = 10):
+    def get_task_instances(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs):
         import json
 
         from airflow.models import TaskInstance
@@ -701,7 +701,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_task_instances(self, task_instances: list):
+    def set_task_instances(self, task_instances: list, **kwargs):
         task_instances = self.insert_directly("task_instance", task_instances)
 
         # populate dag_version_id
@@ -940,7 +940,7 @@ class StarshipAirflow30(StarshipAirflow):
             # Note: serialization issues: next_method and next_kwargs intentionally omitted
         }
 
-    def get_task_instance_history(self, dag_id: str, offset: int = 0, limit: int = 10):
+    def get_task_instance_history(self, dag_id: str, offset: int = 0, limit: int = 10, **kwargs):
         from airflow.models import DagRun
         from airflow.models.taskinstancehistory import TaskInstanceHistory
         from sqlalchemy import desc
@@ -973,7 +973,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def set_task_instance_history(self, task_instances: list):
+    def set_task_instance_history(self, task_instances: list, **kwargs):
         task_instances = self.insert_directly("task_instance_history", task_instances)
         return {"task_instances": task_instances}
 
@@ -1042,7 +1042,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def get_latest_dag_version_id(self, dag_id: str):
+    def get_latest_dag_version_id(self, dag_id: str, **kwargs):
         from sqlalchemy import MetaData, desc, select
 
         try:
@@ -1064,7 +1064,7 @@ class StarshipAirflow30(StarshipAirflow):
             self.session.rollback()
             raise e
 
-    def update_dag_version_id(self, dag_id: str, dag_version_id: str = None):
+    def update_dag_version_id(self, dag_id: str, dag_version_id: str = None, **kwargs):
         """
         Update dag_version_id(FK) for task instances AND dag runs that have NULL values.
         Update created_dag_version_id on dag_run records so the UI can properly display them.
@@ -1252,38 +1252,6 @@ class StarshipAirflow33(StarshipAirflow32):
         return attrs
 
 
-class StarshipCompatabilityLayer:
-    """StarshipCompatabilityLayer is a factory class that returns the correct StarshipAirflow class for a version
-
-    - 3.0 https://github.com/apache/airflow/tree/3.0.6/airflow-core/src/airflow/models
-    - 3.1 https://github.com/apache/airflow/tree/3.1.8/airflow-core/src/airflow/models
-    - 3.2 https://github.com/apache/airflow/tree/3.2.2/airflow-core/src/airflow/models
-    - 3.3 https://github.com/apache/airflow/tree/3.3.1/airflow-core/src/airflow/models
-    """
-
-    def __new__(cls, airflow_version: "Union[str, None]" = None) -> StarshipAirflow:
-        from airflow import __version__
-        from packaging.version import Version
-
-        if airflow_version is None:
-            airflow_version = __version__
-
-        version = Version(airflow_version)
-        major, minor = version.major, version.minor
-
-        if major == 3:
-            if minor == 0:
-                return StarshipAirflow30()
-            elif minor == 1:
-                return StarshipAirflow31()
-            elif minor == 2:
-                return StarshipAirflow32()
-            elif minor == 3:
-                return StarshipAirflow33()
-
-        raise RuntimeError(f"Unsupported Airflow Version: {airflow_version}")
-
-
     @classmethod
     def task_log_attrs(cls) -> "Dict[str, AttrDesc]":
         return {
@@ -1463,3 +1431,36 @@ class StarshipCompatabilityLayer:
             remote_path.unlink()
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
+
+
+
+class StarshipCompatabilityLayer:
+    """StarshipCompatabilityLayer is a factory class that returns the correct StarshipAirflow class for a version
+
+    - 3.0 https://github.com/apache/airflow/tree/3.0.6/airflow-core/src/airflow/models
+    - 3.1 https://github.com/apache/airflow/tree/3.1.8/airflow-core/src/airflow/models
+    - 3.2 https://github.com/apache/airflow/tree/3.2.2/airflow-core/src/airflow/models
+    - 3.3 https://github.com/apache/airflow/tree/3.3.1/airflow-core/src/airflow/models
+    """
+
+    def __new__(cls, airflow_version: "Union[str, None]" = None) -> StarshipAirflow:
+        from airflow import __version__
+        from packaging.version import Version
+
+        if airflow_version is None:
+            airflow_version = __version__
+
+        version = Version(airflow_version)
+        major, minor = version.major, version.minor
+
+        if major == 3:
+            if minor == 0:
+                return StarshipAirflow30()
+            elif minor == 1:
+                return StarshipAirflow31()
+            elif minor == 2:
+                return StarshipAirflow32()
+            elif minor == 3:
+                return StarshipAirflow33()
+
+        raise RuntimeError(f"Unsupported Airflow Version: {airflow_version}")

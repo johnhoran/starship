@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Annotated
+from unittest import result
 
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.security import requires_access_configuration
@@ -101,7 +102,7 @@ class StarshipRoute:
             if res is None:
                 return None
             if inspect.iscoroutine(res):
-                return res
+                return jsonresponse_async(res)
 
             return JSONResponse(res)
         except HttpError as e:
@@ -119,6 +120,23 @@ class StarshipRoute:
                 500,
             )
 
+async def jsonresponse_async(result):
+    try:
+        response = await result
+        return JSONResponse(response)
+    except HttpError as e:
+        return JSONResponse({"error": e.msg}, e.status_code)
+    except Exception as e:
+        import traceback
+
+        return JSONResponse(
+            {
+                "error": "Unknown Error",
+                "error_type": str(type(e)),
+                "error_message": f"{e}\n{traceback.format_exc()}",
+            },
+            500,
+        )
 
 async def starship_route(request: Request) -> StarshipRoute:
     """async 'dependable' to build StarshipRoute from Request"""

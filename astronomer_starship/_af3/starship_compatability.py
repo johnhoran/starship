@@ -1404,12 +1404,12 @@ class StarshipAirflow33(StarshipAirflow32):
         body = await request.body()
 
         return await asyncio.to_thread(
-            self.sync_set_task_log,
+            self._sync_set_task_log,
             body=body,
             **kwargs
         )
 
-    def sync_set_task_log(self, body: bytes, dag_id: str, run_id: str,**kwargs):
+    def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str,**kwargs):
         import smart_open
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
 
@@ -1441,6 +1441,23 @@ class StarshipAirflow33(StarshipAirflow32):
             remote_path.unlink()
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
+
+    async def head_task_log(self, **kwargs):
+        """Check if the log for a task instance exists"""
+        path, conn_id = self._task_log_path(**kwargs)
+        if not path.startswith("s3://"):
+            raise NotImplementedError("head_task_log is only implemented for S3 paths")
+        _, _, bucket, key = path.split("/", 3)
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+        hook = S3Hook(aws_conn_id=conn_id)
+        async with await hook.get_async_conn() as client:
+            obj = await self.hook.get_head_object_async(
+                client=client, key=key, bucket_name=bucket
+            )
+
+        return obj
 
     def _fix_dagrun_log_config(self, dag_id: str, run_id: str):
         from sqlalchemy import MetaData, select, text, update

@@ -1418,7 +1418,8 @@ class StarshipAirflow33(StarshipAirflow32):
             text = (await request.body()).decode("utf-8")  # Must match the sender's actual encoding.
             written = f.write(text)
 
-        return {"message": f"Data stream processed successfully, wrote {written} bytes"}
+        log_id = self._fix_dagrun_log_config()
+        return {"message": f"Data stream processed successfully, wrote {written} bytes, log_id={log_id}"}
 
     async def delete_task_log(self, **kwargs):
         """Delete the log for a task instance"""
@@ -1431,6 +1432,21 @@ class StarshipAirflow33(StarshipAirflow32):
             remote_path.unlink()
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
+
+    def _fix_dagrun_log_config(self):
+
+        from sqlalchemy import text
+
+        log_id = self.session.execute(
+            text("""
+                SELECT id
+                FROM log_template
+                WHERE filename='dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number }}.log'
+                ORDER BY id DESC LIMIT 1
+            """)
+        ).scalar()
+
+        return log_id
 
 
 

@@ -5,6 +5,7 @@ from datetime import timezone
 from typing import TYPE_CHECKING
 import os
 from fastapi import Request
+from astronomer_starship.common import NotFoundError
 from pathlib import Path
 from astronomer_starship.common import (
     BaseStarshipAirflow,
@@ -1451,7 +1452,10 @@ class StarshipAirflow33(StarshipAirflow32):
                 client=client, key=key, bucket_name=bucket
             )
 
-        return {"message": f"Head object response {obj}"}
+        if obj is None:
+            raise NotFoundError()
+
+        return {}
 
     def _fix_dagrun_log_config(self, dag_id: str, run_id: str):
         from sqlalchemy import MetaData, select, text, update

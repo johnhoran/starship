@@ -14,6 +14,7 @@ from astronomer_starship.common import (
     NotFoundError,
 )
 import asyncio
+from airflow.configuration import conf
 
 if TYPE_CHECKING:
     from typing import Dict, Union
@@ -1332,16 +1333,9 @@ class StarshipAirflow33(StarshipAirflow32):
 
         if astronomer_environment == "cloud":
             # Astro Hosted
-            base_folder = os.getenv("AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER")
-            conn_id = None
-            for key in [
-                "AIRFLOW_CONN_ASTRO_GCS_LOGGING",
-                "AIRFLOW_CONN_ASTRO_AZURE_LOGS",
-                "AIRFLOW_CONN_ASTRO_S3_LOGGING",
-            ]:
-                conn_id = os.getenv(key)
-                if conn_id is not None:
-                    break
+            base_folder = conf.get("logging", "remote_base_log_folder", fallback=None)
+            conn_id = conf.get("logging", "remote_log_conn_id", fallback=None)
+
 
             if conn_id is None:
                 raise ConflictError("No remote logging connection found.")

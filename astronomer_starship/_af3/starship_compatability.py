@@ -1447,7 +1447,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
         hook = S3Hook(aws_conn_id=conn_id)
         async with await hook.get_async_conn() as client:
-            obj = await self.hook.get_head_object_async(
+            obj = await hook.get_head_object_async(
                 client=client, key=key, bucket_name=bucket
             )
 

@@ -1446,6 +1446,12 @@ class StarshipAirflow33(StarshipAirflow32):
     async def head_task_log(self, **kwargs):
         """Check if the log for a task instance exists"""
         path, conn_id = self._task_log_path(**kwargs)
+
+        if conn_id is None:
+            if not Path(path).exists():
+                raise NotFoundError(msg=f"Task log at {path} not found")
+            return {}
+
         if not path.startswith("s3://"):
             raise NotImplementedError("head_task_log is only implemented for S3 paths")
         _, _, bucket, key = path.split("/", 3)

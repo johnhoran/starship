@@ -55,12 +55,12 @@ class StarshipRoute:
 
         try:
             if self.method == "GET":
-                res = get(**kwargs, request=self.request) if inspect.iscoroutinefunction(get) else get(**kwargs)
+                res = get(**kwargs, request=self.request)
             elif self.method == "POST":
                 from sqlalchemy.exc import DataError, IntegrityError, StatementError
 
                 try:
-                    res = post(**kwargs, request=self.request) if inspect.iscoroutinefunction(post) else post(**kwargs)
+                    res = post(**kwargs, request=self.request)
                 except IntegrityError as e:
                     return JSONResponse(
                         {
@@ -89,13 +89,13 @@ class StarshipRoute:
                         400,
                     )
             elif self.method == "PUT":
-                res = put(**kwargs, request=self.request) if inspect.iscoroutinefunction(put) else put(**kwargs)
+                res = put(**kwargs, request=self.request)
             elif self.method == "DELETE":
-                res = delete(**kwargs, request=self.request) if inspect.iscoroutinefunction(delete) else delete(**kwargs)
+                res = delete(**kwargs, request=self.request)
             elif self.method == "PATCH":
-                res = patch(**kwargs, request=self.request) if inspect.iscoroutinefunction(patch) else patch(**kwargs)
+                res = patch(**kwargs, request=self.request)
             elif self.method == "HEAD":
-                res = head(**kwargs, request=self.request) if inspect.iscoroutinefunction(head) else head(**kwargs)
+                res = head(**kwargs, request=self.request)
             else:
                 raise RuntimeError(f"Unsupported Method: {self.method}")
 

@@ -4,7 +4,8 @@ import logging
 from datetime import timezone
 from typing import TYPE_CHECKING
 import os
-
+from fastapi import Request
+from pathlib import Path
 from astronomer_starship.common import (
     BaseStarshipAirflow,
     generic_delete,
@@ -1404,10 +1405,10 @@ class StarshipCompatabilityLayer:
         path = os.path.join(base_folder, *path_components)
         return path, conn_id
 
-    def get_task_log(self, **kwargs):
+    async def get_task_log(self, **kwargs):
         """Get the log for a task instance"""
-        from airflow.io.path import ObjectStoragePath
-        from flask import Response
+        from airflow.providers.common.compat.sdk import ObjectStoragePath
+        from fastapi.responses import StreamingResponse
 
         try:
             path, conn_id = self._task_log_path(**kwargs)
@@ -1426,37 +1427,34 @@ class StarshipCompatabilityLayer:
                         yield data
 
                         offset += block_size
-
-            return Response(generator(), mimetype="text/plain")
+            return StreamingResponse(generator(), media_type="text/plain")
         except FileNotFoundError as e:
             raise NotFoundError(f"Task log at {path} not found: {e}") from e
 
-    def set_task_log(self, **kwargs):
-        """Set the log for a task instance"""
-        from airflow.io.path import ObjectStoragePath
-        from flask import request
+    async def set_task_log(self, request: Request, **kwargs):
+        import smart_open
 
         path, conn_id = self._task_log_path(**kwargs)
-        remote_path = ObjectStoragePath(path, conn_id=conn_id)
-        block_size = int(kwargs.get("block_size", 1024 * 1024))
 
-        # If local file system, ensure the parent directories exist.
-        # Causes problems with remote storage (where it is not needed),
-        # as it requires bucket level permissions.
+        open_kwargs = {}
+        if path.startswith("s3://"):
+            from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+            session = S3Hook(aws_conn_id=conn_id).get_session()
+            client = session.client("s3")
+            open_kwargs["transport_params"] = {"client": client}
+
         if conn_id is None:
-            remote_path.parent.mkdir(exist_ok=True, parents=True)
+            Path(path).parent.mkdir(exist_ok=True, parents=True)
 
-        with remote_path.open("wb") as f:
-            while True:
-                data = request.stream.read(block_size)
-                logger.debug("Read %d bytes", len(data))
-                if not data:
-                    break
-                f.write(data)
+        with smart_open.open(path, "w", encoding="iso-8859-1", **open_kwargs) as f:
+            text = (await request.body()).decode("utf-8")  # Must match the sender's actual encoding.
+            written = f.write(text)
 
-    def delete_task_log(self, **kwargs):
+        return {"message": f"Data stream processed successfully, wrote {written} bytes"}
+
+    async def delete_task_log(self, **kwargs):
         """Delete the log for a task instance"""
-        from airflow.io.path import ObjectStoragePath
+        from airflow.providers.common.compat.sdk import ObjectStoragePath
 
         try:
             path, conn_id = self._task_log_path(**kwargs)

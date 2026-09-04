@@ -8,6 +8,7 @@ from airflow.api_fastapi.core_api.security import requires_access_configuration
 from airflow.plugins_manager import AirflowPlugin
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+import inspect
 
 from astronomer_starship._af3.starship_compatability import StarshipAirflow, StarshipCompatabilityLayer
 from astronomer_starship.common import HttpError, get_kwargs_fn, telescope
@@ -32,6 +33,7 @@ class StarshipRoute:
         put=None,
         delete=None,
         patch=None,
+        head=None,
         kwargs_fn: "Callable[[dict, dict], dict]" = None,
     ):
         try:
@@ -52,12 +54,12 @@ class StarshipRoute:
 
         try:
             if self.method == "GET":
-                res = get(**kwargs)
+                res = get(**kwargs, request=self.request)
             elif self.method == "POST":
                 from sqlalchemy.exc import DataError, IntegrityError, StatementError
 
                 try:
-                    res = post(**kwargs)
+                    res = post(**kwargs, request=self.request)
                 except IntegrityError as e:
                     return JSONResponse(
                         {
@@ -86,16 +88,20 @@ class StarshipRoute:
                         400,
                     )
             elif self.method == "PUT":
-                res = put(**kwargs)
+                res = put(**kwargs, request=self.request)
             elif self.method == "DELETE":
-                res = delete(**kwargs)
+                res = delete(**kwargs, request=self.request)
             elif self.method == "PATCH":
-                res = patch(**kwargs)
+                res = patch(**kwargs, request=self.request)
+            elif self.method == "HEAD":
+                res = head(**kwargs, request=self.request)
             else:
                 raise RuntimeError(f"Unsupported Method: {self.method}")
 
             if res is None:
                 return None
+            if inspect.iscoroutine(res):
+                return res
 
             return JSONResponse(res)
         except HttpError as e:

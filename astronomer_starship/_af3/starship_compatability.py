@@ -1451,7 +1451,7 @@ class StarshipAirflow33(StarshipAirflow32):
                 client=client, key=key, bucket_name=bucket
             )
 
-        return obj
+        return {"message": f"Head object response {obj}"}
 
     def _fix_dagrun_log_config(self, dag_id: str, run_id: str):
         from sqlalchemy import MetaData, select, text, update

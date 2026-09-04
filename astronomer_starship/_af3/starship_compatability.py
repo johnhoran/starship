@@ -1453,7 +1453,7 @@ class StarshipAirflow33(StarshipAirflow32):
             )
 
         if obj is None:
-            raise NotFoundError()
+            raise NotFoundError(msg=f"Task log at {path} not found")
 
         return {"message": f"Head object response {obj}"}
 

@@ -16,6 +16,10 @@ from astronomer_starship.common import (
 )
 import asyncio
 from airflow.configuration import conf
+import tempfile
+
+import boto3
+import aioboto3
 
 if TYPE_CHECKING:
     from typing import Dict, Union
@@ -1405,20 +1409,63 @@ class StarshipAirflow33(StarshipAirflow32):
 
         return data
 
-    async def set_task_log(self, request: Request, **kwargs):
+    async def set_task_log(self, request: Request, dag_id: str, run_id: str, **kwargs):
+        self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
+        path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
+        if path.startswith("s3://"):
+            return await self._set_task_log_s3(request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs)
+
         body = await request.body()
 
         return await asyncio.to_thread(
             self._sync_set_task_log,
             body=body,
+            conn_id=conn_id,
+            path=path,
             **kwargs
         )
 
-    def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, **kwargs):
-        import smart_open
-        self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
+    @staticmethod
+    def create_async_session_from_sync(sync_session: boto3.Session) -> aioboto3.Session:
+        # 1. Fetch credentials from the sync session
+        credentials = sync_session.get_credentials()
 
+        # 2. Extract specific auth elements (handles temporary/session tokens too)
+        frozen_creds = credentials.get_frozen_credentials()
+
+        # 3. Build and return the identical aioboto3 Session
+        return aioboto3.Session(
+            aws_access_key_id=frozen_creds.access_key,
+            aws_secret_access_key=frozen_creds.secret_key,
+            aws_session_token=frozen_creds.token,
+            region_name=sync_session.region_name
+        )
+
+    async def _set_task_log_s3(self, request: Request, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        session = S3Hook(aws_conn_id=conn_id).get_session()
+        s3 = self.create_async_session_from_sync(session).client("s3")
+        bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
+
+
+        with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
+            async for chunk in request.stream():
+                if chunk:
+                    temp_file.write(chunk)
+
+            temp_file.flush()
+            temp_file.seek(0)
+
+            await s3.upload_fileobj(temp_file, bucket, blob_s3_key)
+
+
+
+
+
+    def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
+        import smart_open
 
         open_kwargs = {}
         if path.startswith("s3://"):

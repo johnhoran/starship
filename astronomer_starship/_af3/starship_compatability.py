@@ -1588,7 +1588,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
     def set_events(self, dag_id: str, logs: list):
 
-        logs = self.insert_directly("logs", logs)
+        logs = self.insert_directly("log", logs)
         return {"log_count": self._get_event_count(dag_id)}
 
 

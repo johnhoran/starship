@@ -1501,7 +1501,7 @@ class StarshipAirflow33(StarshipAirflow32):
             raise e
 
     @classmethod
-    def event_attrs(cls) -> "dict[str, AttrDesc]":
+    def events_attrs(cls) -> "dict[str, AttrDesc]":
         return {
             "dag_id": {
                 "attr": "dag_id",

@@ -1548,7 +1548,7 @@ class StarshipAirflow33(StarshipAirflow32):
         }
 
     def get_events(self, dag_id: str, offset: int = 0, limit: int = 10):
-        from sqlalchemy import MetaData, String, desc, select
+        from sqlalchemy import MetaData, desc, select
 
         try:
             engine = self.session.get_bind()

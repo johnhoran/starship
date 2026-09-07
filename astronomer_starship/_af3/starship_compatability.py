@@ -1502,6 +1502,8 @@ class StarshipAirflow33(StarshipAirflow32):
 
     @classmethod
     def events_attrs(cls) -> "dict[str, AttrDesc]":
+        epoch = datetime.datetime(1970, 1, 1, 0, 0)
+        epoch_tz = epoch.replace(tzinfo=timezone.utc)
         return {
             "dag_id": {
                 "attr": "dag_id",
@@ -1521,6 +1523,25 @@ class StarshipAirflow33(StarshipAirflow32):
                 "methods": [("GET", False)],
                 "test_value": 0,
             },
+            "logs": {
+                "attr": "logs",
+                "methods": [("POST", True)],
+                "test_value": [
+                    {
+                        "dag_id": "zdp_dbt_template",
+                        "event": "trigger",
+                        "execution_date": epoch_tz,
+                        "extra": '{"origin": "/dmz3k0ai/dags/zdp_dbt_template/grid?search=zdp_dbt_template"}',
+                        "map_index": None,
+                        "owner": "cl7g0ojxw383491qtxh826e8npi",
+                        "run_id": None,
+                        "task_id": None,
+                        "try_number": None,
+                        "when": epoch_tz,
+                    }
+                ],
+            },
+
         }
 
     def get_events(self, dag_id: str, offset: int = 0, limit: int = 10):

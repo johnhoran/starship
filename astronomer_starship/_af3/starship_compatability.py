@@ -1318,6 +1318,7 @@ class StarshipAirflow33(StarshipAirflow32):
             },
         }
 
+
     @classmethod
     def _task_log_path(
         cls,
@@ -1499,6 +1500,75 @@ class StarshipAirflow33(StarshipAirflow32):
             self.session.rollback()
             raise e
 
+    @classmethod
+    def event_attrs(cls) -> "dict[str, AttrDesc]":
+        return {
+            "dag_id": {
+                "attr": "dag_id",
+                "methods": [
+                    ("GET", True),
+                    ("POST", True),
+                ],
+                "test_value": "dag_0",
+            },
+            "limit": {
+                "attr": None,
+                "methods": [("GET", False)],
+                "test_value": 10,
+            },
+            "offset": {
+                "attr": None,
+                "methods": [("GET", False)],
+                "test_value": 0,
+            },
+        }
+
+    def get_events(self, dag_id: str, offset: int = 0, limit: int = 10):
+        from sqlalchemy import MetaData, String, desc, select
+
+        try:
+            engine = self.session.get_bind()
+            metadata = MetaData()
+            metadata.reflect(engine, only=["log"])
+            table = metadata.tables["log"]
+
+
+            stmt = select(table).where(table.c.dag_id == dag_id).order_by(desc(table.c.dttm))
+            if offset:
+                stmt = stmt.offset(offset)
+            stmt = stmt.limit(limit)
+
+            result = self.session.execute(stmt)
+            logs_data = [dict(row._mapping) for row in result]
+
+            return json.loads(
+                json.dumps(
+                    {
+                        "logs": logs_data,
+                        "log_count": self._get_event_count(dag_id),
+                    },
+                    default=str,
+                )
+            )
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def _get_event_count(self, dag_id: str):
+        from airflow.models import Log
+        from sqlalchemy import distinct
+        from sqlalchemy.sql.functions import count
+
+        try:
+            return self.session.query(count(distinct(Log.id))).filter(Log.dag_id == dag_id).one()[0]
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def set_events(self, dag_id: str, logs: list):
+
+        logs = self.insert_directly("logs", logs)
+        return {"log_count": self._get_event_count(dag_id)}
 
 
 class StarshipCompatabilityLayer:

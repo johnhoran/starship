@@ -495,3 +495,13 @@ class BaseStarshipAirflow:
 
     def delete_xcom(self, **kwargs):
         raise NotImplementedError("Subclasses must implement delete_xcom method")
+
+    @classmethod
+    def events_attrs(cls) -> "Dict[str, AttrDesc]":
+        raise NotImplementedError("Subclasses must implement events_attrs method")
+
+    def set_events(self, **kwargs):
+        raise NotImplementedError("Subclasses must implement set_events method")
+
+    def get_events(self, **kwargs):
+        raise NotImplementedError("Subclasses must implement get_events method")

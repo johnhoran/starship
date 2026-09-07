@@ -329,6 +329,18 @@ class StarshipApi(FastAPI):
             kwargs_fn=partial(get_kwargs_fn, attrs=starship_compat.xcom_attrs()),
         )
 
+    @router.api_route("/events", methods=["GET", "POST"])
+    @staticmethod
+    def events(
+        starship_route: Annotated[StarshipRoute, Depends(starship_route)],
+        starship_compat: Annotated[StarshipAirflow, Depends(starship_compat)],
+    ):
+        return starship_route(
+            get=starship_compat.get_events,
+            post=starship_compat.set_events,
+            kwargs_fn=partial(get_kwargs_fn, attrs=starship_compat.events_attrs()),
+        )
+
 
 class StarshipAPIPlugin(AirflowPlugin):
     name = "starship_api"

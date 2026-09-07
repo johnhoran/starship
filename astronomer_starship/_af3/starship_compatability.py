@@ -1002,6 +1002,9 @@ class StarshipAirflow30(StarshipAirflow):
                 item.pop("backfill_id", None)
             if table_name == "task_instance":
                 item.pop("trigger_id", None)
+            if table_name == "log":
+                item.pop("event_log_id", None)
+                item["dttm"] = item.pop("when")
 
             if "executor_config" in item:
                 # Drop executor_config, because its original type may have gotten lost

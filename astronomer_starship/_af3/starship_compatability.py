@@ -8,6 +8,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import aiobotocore.session
 import boto3
 from airflow.configuration import conf
 from fastapi import Request
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from typing import Dict, Union
 
     from astronomer_starship.common import AttrDesc
-    import aiobotocore.session
+
 
 
 logger = logging.getLogger(__name__)
@@ -1417,7 +1418,7 @@ class StarshipAirflow33(StarshipAirflow32):
         return await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
 
     @staticmethod
-    def create_async_session_from_sync(sync_session: boto3.Session) -> "aiobotocore.session.AioSession":
+    def create_async_session_from_sync(sync_session: boto3.Session) -> aiobotocore.session.AioSession:
         # 1. Fetch credentials from the sync session
         credentials = sync_session.get_credentials()
 

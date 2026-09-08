@@ -1436,11 +1436,7 @@ class StarshipAirflow33(StarshipAirflow32):
         frozen_creds = credentials.get_frozen_credentials()
 
         session = aiobotocore.session.get_session()
-        session.set_credentials(
-            aws_access_key_id=frozen_creds.access_key,
-            aws_secret_access_key=frozen_creds.secret_key,
-            aws_session_token=frozen_creds.token
-        )
+        session.set_credentials(**frozen_creds)
         return session
 
 

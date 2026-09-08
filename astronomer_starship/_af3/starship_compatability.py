@@ -1436,7 +1436,12 @@ class StarshipAirflow33(StarshipAirflow32):
         frozen_creds = credentials.get_frozen_credentials()
 
         session = aiobotocore.session.get_session()
-        session.set_credentials(**frozen_creds)
+        session.set_credentials(
+            access_key=frozen_creds.access_key,
+            secret_key=frozen_creds.secret_key,
+            token=frozen_creds.token,
+            account_id=frozen_creds.account_id,
+        )
         return session
 
 

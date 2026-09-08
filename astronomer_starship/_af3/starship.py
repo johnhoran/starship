@@ -96,7 +96,7 @@ async def proxy(request: Request):
         proxy_headers["Content-Type"] = "application/json"
 
     try:
-        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:  # noqa: S501  # nosec B501
+        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:  # nosec B501
             response = await client.request(
                 method=request.method,
                 url=url,
@@ -143,7 +143,7 @@ async def proxy(request: Request):
 
     except httpx.RequestError as e:
         return Response(
-            content=f"Proxy request failed: {str(e)}",
+            content=f"Proxy request failed: {e!s}",
             status_code=502,
         )
 

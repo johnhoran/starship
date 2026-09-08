@@ -1,27 +1,27 @@
+import asyncio
 import datetime
 import json
 import logging
-from datetime import timezone
-from typing import TYPE_CHECKING
 import os
-from fastapi import Request
-from astronomer_starship.common import NotFoundError
+import tempfile
+from datetime import timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import aiobotocore
+import aiobotocore.client
+import aiobotocore.session
+import boto3
+from airflow.configuration import conf
+from fastapi import Request
+
 from astronomer_starship.common import (
     BaseStarshipAirflow,
-    generic_delete,
-    results_to_list_via_attrs,
     ConflictError,
     NotFoundError,
+    generic_delete,
+    results_to_list_via_attrs,
 )
-import asyncio
-from airflow.configuration import conf
-import tempfile
-
-import boto3
-import aiobotocore
-import aiobotocore.session
-import aiobotocore.client
 
 if TYPE_CHECKING:
     from typing import Dict, Union
@@ -1263,7 +1263,6 @@ class StarshipAirflow33(StarshipAirflow32):
         )
         return attrs
 
-
     @classmethod
     def task_log_attrs(cls) -> "Dict[str, AttrDesc]":
         return {
@@ -1327,7 +1326,6 @@ class StarshipAirflow33(StarshipAirflow32):
             },
         }
 
-
     @classmethod
     def _task_log_path(
         cls,
@@ -1346,7 +1344,6 @@ class StarshipAirflow33(StarshipAirflow32):
             # Astro Hosted
             base_folder = conf.get("logging", "remote_base_log_folder", fallback=None)
             conn_id = conf.get("logging", "remote_log_conn_id", fallback=None)
-
 
             if conn_id is None:
                 raise ConflictError("No remote logging connection found.")
@@ -1379,13 +1376,10 @@ class StarshipAirflow33(StarshipAirflow32):
         path = os.path.join(base_folder, *path_components)
         return path, conn_id
 
-
     async def get_task_log(self, request: Request, **kwargs):
         from fastapi.responses import PlainTextResponse
-        body = await asyncio.to_thread(
-            self._sync_get_task_log,
-            **kwargs
-        )
+
+        body = await asyncio.to_thread(self._sync_get_task_log, **kwargs)
 
         return PlainTextResponse(body)
 
@@ -1397,6 +1391,7 @@ class StarshipAirflow33(StarshipAirflow32):
         open_kwargs = {}
         if path.startswith("s3://"):
             from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
             session = S3Hook(aws_conn_id=conn_id).get_session()
             client = session.client("s3")
             open_kwargs["transport_params"] = {"client": client}
@@ -1415,17 +1410,13 @@ class StarshipAirflow33(StarshipAirflow32):
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
         if path.startswith("s3://"):
-            return await self._set_task_log_s3(request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs)
+            return await self._set_task_log_s3(
+                request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
+            )
 
         body = await request.body()
 
-        return await asyncio.to_thread(
-            self._sync_set_task_log,
-            body=body,
-            conn_id=conn_id,
-            path=path,
-            **kwargs
-        )
+        return await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
 
     @staticmethod
     def create_async_session_from_sync(sync_session: boto3.Session) -> aiobotocore.session.AioSession:
@@ -1444,14 +1435,13 @@ class StarshipAirflow33(StarshipAirflow32):
         )
         return session
 
-
     async def _set_task_log_s3(self, request: Request, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
         bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-        session = S3Hook(aws_conn_id=conn_id).get_session()
 
+        session = self.create_async_session_from_sync(S3Hook(aws_conn_id=conn_id).get_session())
 
         with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
             async for chunk in request.stream():
@@ -1461,15 +1451,8 @@ class StarshipAirflow33(StarshipAirflow32):
             temp_file.flush()
             temp_file.seek(0)
 
-            async with self.create_async_session_from_sync(session).create_client("s3") as s3:
-                await s3.upload_fileobj(
-                    Fileobj=temp_file,
-                    Bucket=bucket,
-                    Key=blob_s3_key
-                )
-
-
-
+            async with session.create_client("s3") as s3:
+                await s3.upload_fileobj(Fileobj=temp_file, Bucket=bucket, Key=blob_s3_key)
 
     def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         import smart_open
@@ -1477,6 +1460,7 @@ class StarshipAirflow33(StarshipAirflow32):
         open_kwargs = {}
         if path.startswith("s3://"):
             from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
             session = S3Hook(aws_conn_id=conn_id).get_session()
             client = session.client("s3")
             open_kwargs["transport_params"] = {"client": client}
@@ -1518,9 +1502,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
         hook = S3Hook(aws_conn_id=conn_id)
         async with await hook.get_async_conn() as client:
-            obj = await hook.get_head_object_async(
-                client=client, key=key, bucket_name=bucket
-            )
+            obj = await hook.get_head_object_async(client=client, key=key, bucket_name=bucket)
 
         if obj is None:
             raise NotFoundError(msg=f"Task log at {path} not found")
@@ -1598,7 +1580,6 @@ class StarshipAirflow33(StarshipAirflow32):
                     }
                 ],
             },
-
         }
 
     def get_events(self, dag_id: str, offset: int = 0, limit: int = 10):
@@ -1609,7 +1590,6 @@ class StarshipAirflow33(StarshipAirflow32):
             metadata = MetaData()
             metadata.reflect(engine, only=["log"])
             table = metadata.tables["log"]
-
 
             stmt = select(table).where(table.c.dag_id == dag_id).order_by(desc(table.c.dttm))
             if offset:

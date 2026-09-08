@@ -1,15 +1,14 @@
+import inspect
 import json
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Annotated
-from unittest import result
 
 from airflow.api_fastapi.common.router import AirflowRouter
 from airflow.api_fastapi.core_api.security import requires_access_configuration
 from airflow.plugins_manager import AirflowPlugin
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-import inspect
 
 from astronomer_starship._af3.starship_compatability import StarshipAirflow, StarshipCompatabilityLayer
 from astronomer_starship.common import HttpError, get_kwargs_fn, telescope
@@ -91,7 +90,9 @@ class StarshipRoute:
             elif self.method == "PUT":
                 res = put(**kwargs, request=self.request) if inspect.iscoroutinefunction(put) else put(**kwargs)
             elif self.method == "DELETE":
-                res = delete(**kwargs, request=self.request) if inspect.iscoroutinefunction(delete) else delete(**kwargs)
+                res = (
+                    delete(**kwargs, request=self.request) if inspect.iscoroutinefunction(delete) else delete(**kwargs)
+                )
             elif self.method == "PATCH":
                 res = patch(**kwargs, request=self.request) if inspect.iscoroutinefunction(patch) else patch(**kwargs)
             elif self.method == "HEAD":
@@ -120,6 +121,7 @@ class StarshipRoute:
                 500,
             )
 
+
 async def response_async(result):
     try:
         response = await result
@@ -140,6 +142,7 @@ async def response_async(result):
             500,
         )
 
+
 async def starship_route(request: Request) -> StarshipRoute:
     """async 'dependable' to build StarshipRoute from Request"""
     body = await request.body()
@@ -148,6 +151,7 @@ async def starship_route(request: Request) -> StarshipRoute:
         args=(request.query_params if request.method in ["GET", "POST", "DELETE", "PUT", "HEAD"] else {}),
         json=await request.json() if body else {},
     )
+
 
 def starship_route_async(request: Request) -> StarshipRoute:
     return StarshipRoute(

@@ -15,7 +15,7 @@ readme = "README.md"
 license = { text = "PROPRIETARY" }
 requires-python = ">=3.6"
 dependencies = [
-    "aiobotocore"
+    "aioboto3"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

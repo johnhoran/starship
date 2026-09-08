@@ -19,7 +19,9 @@ from airflow.configuration import conf
 import tempfile
 
 import boto3
-import aioboto3
+import aiobotocore
+import aiobotocore.session
+import aiobotocore.client
 
 if TYPE_CHECKING:
     from typing import Dict, Union
@@ -1426,29 +1428,29 @@ class StarshipAirflow33(StarshipAirflow32):
         )
 
     @staticmethod
-    def create_async_session_from_sync(sync_session: boto3.Session) -> aioboto3.Session:
+    def create_async_session_from_sync(sync_session: boto3.Session) -> aiobotocore.session.AioSession:
         # 1. Fetch credentials from the sync session
         credentials = sync_session.get_credentials()
 
         # 2. Extract specific auth elements (handles temporary/session tokens too)
         frozen_creds = credentials.get_frozen_credentials()
 
-        # 3. Build and return the identical aioboto3 Session
-        return aioboto3.Session(
+        session = aiobotocore.session.get_session()
+        session.set_credentials(
             aws_access_key_id=frozen_creds.access_key,
             aws_secret_access_key=frozen_creds.secret_key,
-            aws_session_token=frozen_creds.token,
-            region_name=sync_session.region_name
+            aws_session_token=frozen_creds.token
         )
+        return session
+
 
     async def _set_task_log_s3(self, request: Request, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
+        bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         session = S3Hook(aws_conn_id=conn_id).get_session()
-        s3 = self.create_async_session_from_sync(session).client("s3")
-        bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
-
+        s3 = self.create_async_session_from_sync(session).create_client("s3")
 
         with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
             async for chunk in request.stream():
@@ -1458,8 +1460,11 @@ class StarshipAirflow33(StarshipAirflow32):
             temp_file.flush()
             temp_file.seek(0)
 
-            await s3.upload_fileobj(temp_file, bucket, blob_s3_key)
-
+            await s3.upload_fileobj(
+                Fileobj=temp_file,
+                Bucket=bucket,
+                Key=blob_s3_key
+            )
 
 
 

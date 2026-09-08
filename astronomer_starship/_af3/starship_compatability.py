@@ -8,11 +8,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import aiobotocore
-import aiobotocore.client
-import aiobotocore.session
 import boto3
-import aioboto3
 from airflow.configuration import conf
 from fastapi import Request
 
@@ -28,6 +24,7 @@ if TYPE_CHECKING:
     from typing import Dict, Union
 
     from astronomer_starship.common import AttrDesc
+    import aiobotocore.session
 
 
 logger = logging.getLogger(__name__)
@@ -1420,18 +1417,19 @@ class StarshipAirflow33(StarshipAirflow32):
         return await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
 
     @staticmethod
-    def create_async_session_from_sync(sync_session: boto3.Session) -> aioboto3.Session:
+    def create_async_session_from_sync(sync_session: boto3.Session) -> "aiobotocore.session.AioSession":
         # 1. Fetch credentials from the sync session
         credentials = sync_session.get_credentials()
 
         # 2. Extract specific auth elements (handles temporary/session tokens too)
         frozen_creds = credentials.get_frozen_credentials()
 
-        session = aioboto3.Session(
-            aws_access_key_id=frozen_creds.access_key,
-            aws_secret_access_key=frozen_creds.secret_key,
-            aws_session_token=frozen_creds.token,
-            aws_account_id=frozen_creds.account_id,
+        session = aiobotocore.session.get_session()
+        session.set_credentials(
+            access_key=frozen_creds.access_key,
+            secret_key=frozen_creds.secret_key,
+            token=frozen_creds.token,
+            account_id=frozen_creds.account_id,
         )
         return session
 
@@ -1451,7 +1449,7 @@ class StarshipAirflow33(StarshipAirflow32):
             temp_file.flush()
             temp_file.seek(0)
 
-            async with session.client("s3") as s3:
+            async with session.create_client("s3") as s3:
                 await s3.upload_fileobj(Fileobj=temp_file, Bucket=bucket, Key=blob_s3_key)
 
     def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):

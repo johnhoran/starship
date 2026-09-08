@@ -1438,20 +1438,30 @@ class StarshipAirflow33(StarshipAirflow32):
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
         bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
 
+        body = await request.body()
+
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
         session = self.create_async_session_from_sync(S3Hook(aws_conn_id=conn_id).get_session())
 
-        with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
-            async for chunk in request.stream():
-                if chunk:
-                    temp_file.write(chunk)
+        async with session.create_client("s3") as s3:
+            await s3.put_object(
+                Bucket=bucket,
+                Key=blob_s3_key,
+                Body=body
+            )
 
-            temp_file.flush()
-            temp_file.seek(0)
 
-            async with session.create_client("s3") as s3:
-                await s3.upload_fileobj(Fileobj=temp_file, Bucket=bucket, Key=blob_s3_key)
+        # with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
+        #     async for chunk in request.stream():
+        #         if chunk:
+        #             temp_file.write(chunk)
+
+        #     temp_file.flush()
+        #     temp_file.seek(0)
+
+        #     async with session.create_client("s3") as s3:
+        #         await s3.upload_fileobj(Fileobj=temp_file, Bucket=bucket, Key=blob_s3_key)
 
     def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         import smart_open

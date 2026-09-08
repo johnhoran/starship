@@ -1451,7 +1451,7 @@ class StarshipAirflow33(StarshipAirflow32):
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         session = S3Hook(aws_conn_id=conn_id).get_session()
-        s3 = self.create_async_session_from_sync(session).create_client("s3")
+
 
         with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
             async for chunk in request.stream():
@@ -1461,11 +1461,12 @@ class StarshipAirflow33(StarshipAirflow32):
             temp_file.flush()
             temp_file.seek(0)
 
-            await s3.upload_fileobj(
-                Fileobj=temp_file,
-                Bucket=bucket,
-                Key=blob_s3_key
-            )
+            async with self.create_async_session_from_sync(session).create_client("s3") as s3:
+                await s3.upload_fileobj(
+                    Fileobj=temp_file,
+                    Bucket=bucket,
+                    Key=blob_s3_key
+                )
 
 
 

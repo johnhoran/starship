@@ -1408,17 +1408,21 @@ class StarshipAirflow33(StarshipAirflow32):
     async def set_task_log(self, request: Request, dag_id: str, run_id: str, **kwargs):
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
-        self._fix_task_run_pool(dag_id=dag_id, run_id=run_id, **kwargs)
         body = await request.body()
-        if not body:
-            return
 
-        if path.startswith("s3://"):
-            return await self._set_task_log_s3(
-                request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
-            )
+        res = None
+        if body:
+            if path.startswith("s3://"):
+                res = await self._set_task_log_s3(
+                    request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
+                )
+            else:
+                res = await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
+        else:
+            res = {"message": "No body"}
 
-        return await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
+        self._fix_task_run_pool(dag_id=dag_id, run_id=run_id, **kwargs)
+        return res
 
     @staticmethod
     def create_async_session_from_sync(sync_session: boto3.Session) -> aiobotocore.session.AioSession:
@@ -1451,6 +1455,8 @@ class StarshipAirflow33(StarshipAirflow32):
                 Key=blob_s3_key,
                 Body=body
             )
+
+        return {"message": f"Data stream processed successfully"}
 
 
     def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):

@@ -1315,6 +1315,14 @@ class StarshipAirflow33(StarshipAirflow32):
                 ],
                 "test_value": 0,
             },
+            "pool_override": {
+                "attr": "pool_override",
+                "methods": [
+                    ("PUT", False),
+                ],
+                "test_value": "default_pool",
+            },
+
             "block_size": {
                 "attr": "block_size",
                 "methods": [
@@ -1421,7 +1429,8 @@ class StarshipAirflow33(StarshipAirflow32):
         else:
             res = {"message": "No body"}
 
-        self._fix_task_run_pool(dag_id=dag_id, run_id=run_id, **kwargs)
+        if kwargs.get("pool_override", ""):
+            self._fix_task_run_pool(dag_id=dag_id, run_id=run_id, **kwargs)
         return res
 
     @staticmethod
@@ -1550,6 +1559,7 @@ class StarshipAirflow33(StarshipAirflow32):
         task_id: str,
         map_index: int = -1,
         try_number: int = 1,
+        pool_override: str = "default_pool",
         **kwargs
     ):
         from sqlalchemy import MetaData, update
@@ -1569,7 +1579,7 @@ class StarshipAirflow33(StarshipAirflow32):
                     table.c.map_index == map_index,
                     table.c.try_number == try_number,
                 )
-                .values(pool="default_pool")
+                .values(pool=pool_override)
             )
 
             self.session.execute(stmt)

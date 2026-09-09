@@ -1408,12 +1408,15 @@ class StarshipAirflow33(StarshipAirflow32):
     async def set_task_log(self, request: Request, dag_id: str, run_id: str, **kwargs):
         self._fix_dagrun_log_config(dag_id=dag_id, run_id=run_id)
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
+        self._fix_task_run_pool(dag_id=dag_id, run_id=run_id, **kwargs)
+        body = await request.body()
+        if not body:
+            return
+
         if path.startswith("s3://"):
             return await self._set_task_log_s3(
                 request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
             )
-
-        body = await request.body()
 
         return await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
 
@@ -1434,11 +1437,9 @@ class StarshipAirflow33(StarshipAirflow32):
         )
         return session
 
-    async def _set_task_log_s3(self, request: Request, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
+    async def _set_task_log_s3(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         path, conn_id = self._task_log_path(dag_id=dag_id, run_id=run_id, **kwargs)
         bucket, blob_s3_key = path.replace("s3://", "").split("/", 1)
-
-        body = await request.body()
 
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
@@ -1451,17 +1452,6 @@ class StarshipAirflow33(StarshipAirflow32):
                 Body=body
             )
 
-
-        # with tempfile.NamedTemporaryFile(mode="w+b") as temp_file:
-        #     async for chunk in request.stream():
-        #         if chunk:
-        #             temp_file.write(chunk)
-
-        #     temp_file.flush()
-        #     temp_file.seek(0)
-
-        #     async with session.create_client("s3") as s3:
-        #         await s3.upload_fileobj(Fileobj=temp_file, Bucket=bucket, Key=blob_s3_key)
 
     def _sync_set_task_log(self, body: bytes, dag_id: str, run_id: str, conn_id: str, path: str, **kwargs):
         import smart_open
@@ -1540,6 +1530,40 @@ class StarshipAirflow33(StarshipAirflow32):
                 update(table)
                 .where(table.c.dag_id == dag_id, table.c.run_id == run_id, table.c.log_template_id == None)
                 .values(log_template_id=subq)
+            )
+
+            self.session.execute(stmt)
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+    def _fix_task_run_pool(self,
+        dag_id: str,
+        run_id: str,
+        task_id: str,
+        map_index: int = -1,
+        try_number: int = 1,
+        **kwargs
+    ):
+        from sqlalchemy import MetaData, update
+
+        try:
+            engine = self.session.get_bind()
+            metadata = MetaData()
+            metadata.reflect(engine, only=["task_instance"])
+            table = metadata.tables["task_instance"]
+
+            stmt = (
+                update(table)
+                .where(
+                    table.c.dag_id == dag_id,
+                    table.c.run_id == run_id,
+                    table.c.task_id == task_id,
+                    table.c.map_index == map_index,
+                    table.c.try_number == try_number,
+                )
+                .values(pool="default_pool")
             )
 
             self.session.execute(stmt)

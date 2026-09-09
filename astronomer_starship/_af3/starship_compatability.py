@@ -1422,7 +1422,7 @@ class StarshipAirflow33(StarshipAirflow32):
         if body:
             if path.startswith("s3://"):
                 res = await self._set_task_log_s3(
-                    request=request, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
+                    body=body, dag_id=dag_id, run_id=run_id, conn_id=conn_id, path=path, **kwargs
                 )
             else:
                 res = await asyncio.to_thread(self._sync_set_task_log, body=body, conn_id=conn_id, path=path, **kwargs)
